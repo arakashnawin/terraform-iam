@@ -1,0 +1,67 @@
+# ----------------------------
+# CONFIGURE OUR AWS CONNECTION
+# ----------------------------
+
+provider "aws" {
+  region = "ap-south-1"
+}
+
+# ---------------
+# CREATE IAM USER
+# ---------------
+resource "aws_iam_user" "demo" {
+  count = var.create_user ? 1 : 0
+
+  name                 = var.name
+  path                 = var.path
+  force_destroy        = var.force_destroy
+  tags = {
+    "testuser" = var.name
+  }
+}
+
+# ---------------------
+# CREATE IAM ACCESS KEY
+# ---------------------
+resource "aws_iam_access_key" "demo" {
+  count = var.create_user && var.create_iam_access_key ? 1 : 0
+
+  user    = aws_iam_user.demo[0].name
+}
+
+#-----------------------------------------------
+# GENERATE AN IAM POLICY DOCUMENT IN JSON FORMAT
+#-----------------------------------------------
+data "aws_iam_policy_document" "demo" {
+  statement {
+    effect    = "Deny"
+    actions   = [
+            "elasticbeanstalk:CreateApplication",
+            "elasticbeanstalk:CreateEnvironment",
+            "elasticbeanstalk:DeleteApplication",
+            "elasticbeanstalk:RebuildEnvironment",
+            "elasticbeanstalk:TerminateEnvironment"
+    ]
+	resources = ["*"]
+  }
+}
+
+# -------------------
+# CREATE A IAM POLICY
+# -------------------
+resource "aws_iam_policy" "dev" {
+  name = "dev_policy"
+  path = "/"
+  policy = data.aws_iam_policy_document.demo.json
+}
+
+# -------------------------
+# ATTACH POLICY TO THE USER
+# -------------------------
+resource "aws_iam_user_policy" "demo" {
+
+  user = aws_iam_user.demo[0].name
+
+  #policy = data.aws_iam_policy_document.demo.json
+  policy = aws_iam_policy.dev.policy
+}
